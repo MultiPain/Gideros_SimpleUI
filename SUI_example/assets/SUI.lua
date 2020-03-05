@@ -785,12 +785,6 @@ function SUI:label(...)
 	return l
 end
 -------------------------------------------------------
-function SUI:grid(...)
-	local g = Grid.new(...)
-	self:addChild(g)
-	return g
-end
--------------------------------------------------------
 function SUI:hGroup(...)
 	local g = Group.new("h",...)
 	self:addChild(g)
