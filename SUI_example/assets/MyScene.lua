@@ -60,11 +60,28 @@ function MyScene:init()
 	end
 	g:add(subGroup)
 	
+	self.progress = self.ui:hProgress(100, false, {
+		Pixel.new(0,1,200,20),
+		{img=Pixel.new(0x00ff00,1,190,16),set={anchorX=-5,anchorY=-2}}
+	})
+	g:add(self.progress)
+	
+	self.timer = 0
+	
 	-- You dont need to add listeners for SUI library if 
 	-- you have added inputType parameter to it.
 	self:addEventListener("touchesBegin", self.touchBegin, self)
 	self:addEventListener("touchesMove", self.touchMove, self)
 	self:addEventListener("touchesEnd", self.touchEnd, self)
+	
+	self:addEventListener("enterFrame", self.update, self)
+end
+--
+function MyScene:update(e)
+	self.timer += e.deltaTime
+	local p = math.sin(self.timer)
+	
+	self.progress:setProgress(SUI.map(p,-1,1,0,100))
 end
 --
 function MyScene:touchBegin(e)
