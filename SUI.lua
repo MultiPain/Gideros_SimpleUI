@@ -195,10 +195,12 @@ end
 --
 function Base:enable()
 	self.enabled = true
+	return self
 end
 --
 function Base:disable()
 	self.enabled = false
+	return self
 end
 --
 function Base:addText(prefix, font, flags)
@@ -206,23 +208,27 @@ function Base:addText(prefix, font, flags)
 	self.prefix = prefix
 	self.label = Label.new(w, h, prefix, flags, font)
 	self:addChild(self.label)
+	return self
 end
 --
 function Base:setTextColor(color)
 	if self.label then 
 		self.label:setTextColor(color)
+		return self
 	end
 end
 --
 function Base:updateText(text)
 	if (self.label) then 
 		self.label:setText(tostring(text))
+		return self
 	end
 end
 --
 function Base:updateValueText(value)
 	if (self.label) then 
 		self.label:setText(self.prefix..": "..tostring(value))
+		return self
 	end
 end
 --
@@ -235,16 +241,19 @@ function Base:removeText()
 		self:removeChild(self.label)
 		self.label = nil
 		self.prefix = nil
+		return self
 	end
 end
 --
 function Base:highlight(flag)
 	self.isHightlighted = flag
 	self:onHightlight(flag)
+	return self
 end
 --
 function Base:setHightlight(func)
 	self.onHightlight = func 
+	return self
 end
 -------------------------------------------------------
 ------------------------ MOUSE ------------------------
@@ -463,7 +472,7 @@ function Slider:init(min, max, value, int)
 
 	-- save user callback
 	self.__userCallback = self.callback
-
+	
 	-- register drag gesture
 	self.gesture:register("Drag")
 end
@@ -472,6 +481,9 @@ function Slider:setValue(value, throwCallback)
 	-- call callback only when value is changing (useful for int values)
 	if (throwCallback and self.prevValue ~= self.value) then
 		self.__userCallback(self, self.value, self.state)
+		self:updateValueText(
+			((self.value*100)//1)/100
+		)
 	end
 end
 
