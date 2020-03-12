@@ -38,7 +38,7 @@ function Gesture:touch(x,y,state,id, ...)
 	if not self.enabled then return end
 	local owner = self.owner
 	
-	if (owner.input and owner:input(x,y,state,id)) then 
+	if (owner.childInput and owner:childInput(x,y,state,id)) then 
 		return true
 	end
 	
@@ -56,6 +56,7 @@ function Gesture:touch(x,y,state,id, ...)
 	end
 	
 	if self.doNotOverlapTouches then eventSucceed = false end
+	if eventSucceed then SUI.focus = owner else SUI.focus = nil end
 	
 	return eventSucceed
 end
@@ -155,6 +156,12 @@ local Base = Core.class(Sprite)
 -- images(table OR sprite object): image(s) to show
 -- callback (function): function to call when gesture fires an event
 -- args (table): extra parameters for some classes (must be key/value pair)
+--	availiable keys:
+--		labelOffsetX, labelOffsetY: offset label position when using "addText" method
+--		labelWidth, labelHeight: set label size when using "addText" method
+--		width, height: pixel size of the slider/progress bar. 
+--			For the slider - used to set maximum X/Y value of the knob.
+--			For the progress bar - used to set maximum bar width/height
 function Base:init(images, callback, args)
 	self.__isUI = true
 	self.enabled = true
@@ -204,9 +211,11 @@ function Base:disable()
 end
 --
 function Base:addText(prefix, font, flags)
-	local w,h=self:getSize()
+	local w=self.labelWidth or self:getWidth()
+	local h=self.labelHeight or self:getHeight()
 	self.prefix = prefix
 	self.label = Label.new(w, h, prefix, flags, font)
+	self.label:setPosition(self.labelOffsetX or 0, self.labelOffsetY or 0)
 	self:addChild(self.label)
 	return self
 end
@@ -254,6 +263,25 @@ end
 function Base:setHightlight(func)
 	self.onHightlight = func 
 	return self
+end
+-- Adds drag&drop behaviour
+function Base:addDragDrop()
+	self.__oldCallback = self.callback
+	self.gesture:unregister("Click")
+	self.gesture:register("Drag")
+	self.callback = function(o,dx,dy,state)
+		local x,y = self:getPosition()
+		x += dx
+		y += dy 
+		self:setPosition(x,y)
+		self:__oldCallback(state)
+	end
+end
+-------------------------------------------------------
+--
+-------------------------------------------------------
+function Base:input(e,a,b,c)
+	return self[e.type](self,e) 
 end
 -------------------------------------------------------
 ------------------------ MOUSE ------------------------
@@ -394,6 +422,7 @@ function CheckBox:setState(state, throwCallback, switchOthers)
 	-- trigger callback or not
 	if (throwCallback) then 
 		self:__userCallback(self.state)
+		self:updateValueText(self.state)
 	end
 end
 -- change group
@@ -420,6 +449,12 @@ function CheckBox:removeFromGroup()
 end
 
 
+-- 
+function CheckBox:addText(...)
+	local l = Base.addText(self,...)
+	self:updateValueText(self.state)
+	return l
+end
 -------------------------------------------------------
 ------------------------ SLIDER -----------------------
 -------------------------------------------------------
@@ -482,11 +517,17 @@ function Slider:setValue(value, throwCallback)
 	if (throwCallback and self.prevValue ~= self.value) then
 		self.__userCallback(self, self.value, self.state)
 		self:updateValueText(
-			((self.value*100)//1)/100
+			((self.value*1000)//1)/1000
 		)
 	end
 end
 
+--
+function Slider:addText(...)
+	local l = Base.addText(self,...)
+	self:updateValueText(self.value)
+	return l
+end
 -------------------------------------------------------
 local HSlider = Core.class(Slider)
 
@@ -585,8 +626,8 @@ function Progress:init(max, inverted)
 	
 	self.progress = 0
 	self.maxProgress = max or 100
-	local bw = self.bar:getWidth()
-	local bh = self.bar:getHeight()
+	local bw = self.width or self.bar:getWidth()
+	local bh = self.height or self.bar:getHeight()
 	
 	self.maxWidth = bw or self.width
 	self.maxHeight = bh or self.height
@@ -619,6 +660,12 @@ end
 --
 function Progress:getProgress()
 	return self.progress
+end
+--
+function Progress:addText(...)
+	local l = Base.addText(self,...)
+	self:updateValueText(self.progress)
+	return l
 end
 -------------------------------------------------------
 local HProgress = Core.class(Progress)
@@ -742,16 +789,17 @@ end
 -------------------------------------------------------
 function SUI:init(controllType)
 	SUI.__checkBoxGroup = {} -- all checkboxes
+	self.touchedElement = nil
 	
 	if (controllType == "touch") then 
-		self:addEventListener("touchesBegin", self.touch, self)
-		self:addEventListener("touchesMove", self.touch, self)
-		self:addEventListener("touchesEnd", self.touch, self)
+		self:addEventListener("touchesBegin", self.input, self)
+		self:addEventListener("touchesMove", self.input, self)
+		self:addEventListener("touchesEnd", self.input, self)
 	elseif (controllType == "mouse") then
-		self:addEventListener("mouseDown", self.mouse, self)
-		self:addEventListener("mouseHover", self.mouse, self)
-		self:addEventListener("mouseMove", self.mouse, self)
-		self:addEventListener("mouseUp", self.mouse, self)
+		self:addEventListener("mouseDown", self.input, self)
+		self:addEventListener("mouseHover", self.input, self)
+		self:addEventListener("mouseMove", self.input, self)
+		self:addEventListener("mouseUp", self.input, self)
 	end
 end
 -------------------------------------------------------
@@ -823,30 +871,26 @@ function SUI:updateCheckBoxGroups(state)
 	end
 end
 -------------------------------------------------------
------------------------- EVENTS -----------------------
+------------------------ INPUT ------------------------
+--------------------- MOUSE/TOUCH ---------------------
 -------------------------------------------------------
-function SUI:loop(funcName, event)
+function SUI:input(event)
+	local evType = event.type
+	
+	-- if there is focused elemnt then check only its input
+	--[[ WIP
+	local focus = SUI.focus
+	if focus and focus.enabled then 
+		return focus:input(event) 
+	end
+	]]
+	
+	-- if not find element that is touching
 	local n = self:getNumChildren()
 	for i = n, 1, -1 do 
 		local spr = self:getChildAt(i)
-		local f = spr[funcName]
-		if spr.enabled then 
-			if (f and f(spr, event)) or (spr.input and spr:input(funcName,event)) then 
-				return true
-			end
+		if spr.enabled and spr.input and spr:input(event) then 
+			return true
 		end
 	end
-end
--------------------------------------------------------
------------------------- MOUSE ------------------------
--------------------------------------------------------
-function SUI:mouse(e)
-	return self:loop(e.type, e)
-end
---
--------------------------------------------------------
------------------------- TOUCH ------------------------
--------------------------------------------------------
-function SUI:touch(e)
-	return self:loop(e.type, e)
 end
