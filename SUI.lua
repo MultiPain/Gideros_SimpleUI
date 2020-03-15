@@ -38,9 +38,7 @@ function Gesture:touch(x,y,state,id, ...)
 	if not self.enabled then return end
 	local owner = self.owner
 	
-	if (owner.childInput and owner:childInput(x,y,state,id)) then 
-		return true
-	end
+	--if (owner.childInput and owner:childInput(x,y,state,id)) then return true end
 	
 	if (state == "begin") then 
 		self.touches[id] = {x = x, y = y}
@@ -152,7 +150,7 @@ end
 ------------------------ BASE -------------------------
 -------------------------------------------------------
 
-local Base = Core.class(Sprite)
+local Base = Core.class(Pixel, function(c,a,w,h) return 0,0,0,0 end)
 -- images(table OR sprite object): image(s) to show
 -- callback (function): function to call when gesture fires an event
 -- args (table): extra parameters for some classes (must be key/value pair)
@@ -201,22 +199,33 @@ function Base:init(images, callback, args)
 end
 --
 function Base:enable()
+	self:setAlpha(1)
 	self.enabled = true
 	return self
 end
 --
 function Base:disable()
+	self:setAlpha(0.5)
 	self.enabled = false
 	return self
 end
---
-function Base:addText(prefix, font, flags)
+-- adds normal text
+function Base:addText(text, font, flags)
+	local w=self.labelWidth or self:getWidth()
+	local h=self.labelHeight or self:getHeight()
+	self.label = Label.new(w, h, text, flags, font)
+	self.label:setPosition(self.labelOffsetX or 0, self.labelOffsetY or 0)
+	self:addChild(self.label)
+	return self
+end
+-- adds text that will be updated with assigned component
+function Base:addValueText(prefix, font, flags)
 	local w=self.labelWidth or self:getWidth()
 	local h=self.labelHeight or self:getHeight()
 	self.prefix = prefix
-	self.label = Label.new(w, h, prefix, flags, font)
-	self.label:setPosition(self.labelOffsetX or 0, self.labelOffsetY or 0)
-	self:addChild(self.label)
+	self.value_label = Label.new(w, h, prefix, flags, font)
+	self.value_label:setPosition(self.labelOffsetX or 0, self.labelOffsetY or 0)
+	self:addChild(self.value_label)
 	return self
 end
 --
@@ -235,20 +244,32 @@ function Base:updateText(text)
 end
 --
 function Base:updateValueText(value)
-	if (self.label) then 
-		self.label:setText(self.prefix..": "..tostring(value))
+	if (self.value_label) then 
+		self.value_label:setText(self.prefix..": "..tostring(value))
 		return self
 	end
 end
 --
-function Base:getText()
+function Base:getLabel()
 	return self.label
+end
+--
+function Base:getValueLabel()
+	return self.value_label
 end
 --
 function Base:removeText()
 	if (self.label) then 
 		self:removeChild(self.label)
 		self.label = nil
+		return self
+	end
+end
+--
+function Base:removeValueText()
+	if (self.value_label) then 
+		self:removeChild(self.value_label)
+		self.value_label = nil
 		self.prefix = nil
 		return self
 	end
@@ -450,8 +471,8 @@ end
 
 
 -- 
-function CheckBox:addText(...)
-	local l = Base.addText(self,...)
+function CheckBox:addValueText(...)
+	local l = Base.addValueText(self,...)
 	self:updateValueText(self.state)
 	return l
 end
@@ -523,8 +544,8 @@ function Slider:setValue(value, throwCallback)
 end
 
 --
-function Slider:addText(...)
-	local l = Base.addText(self,...)
+function Slider:addValueText(...)
+	local l = Base.addValueText(self,...)
 	self:updateValueText(self.value)
 	return l
 end
@@ -662,8 +683,8 @@ function Progress:getProgress()
 	return self.progress
 end
 --
-function Progress:addText(...)
-	local l = Base.addText(self,...)
+function Progress:addValueText(...)
+	local l = Base.addValueText(self,...)
 	self:updateValueText(self.progress)
 	return l
 end
@@ -716,7 +737,7 @@ end
 -------------------------------------------------------
 ------------------------ GROUP ------------------------
 -------------------------------------------------------
-local Group = Core.class(Sprite)
+local Group = Core.class(Base, function(orientation, margin, offset, ...) return ... end)
 
 function Group:init(orientation, margin, offset)
 	self.enabled = true
@@ -762,26 +783,40 @@ function Group:removeAt(ind)
 	self:remove(self:getChildAt(ind))
 end
 --
-function Group:input(funcName,event)
+function Group:input(event)
 	local n = self:getNumChildren()
-	for i = 1, n do 
-		local obj = self:getChildAt(i)
-		local f = obj[funcName]
-		if (f and f(obj, event)) or (obj.input and obj:input(funcName,event)) then 
+	for i = n, 1, -1 do 
+		local spr = self:getChildAt(i)
+		if spr.enabled and spr.input and spr:input(event) then 
 			return true
 		end
 	end
 end
-
 --
--------------------------------------------------------
------------------------- WINDOW -----------------------
--------------------------------------------------------
-
-local Window = Core.class(Group, function(offset) return "h", 0, offset end)
-	
-function Window:init(offset)	
-	
+function Group:hSeparator(color, size)
+	local n = self:getNumChildren()
+	local w = 10
+	if n > 0 then 
+		local last = self:getChildAt(n)
+		w = last:getWidth()
+	end
+	local s = Pixel.new(color or 0xffffff, 1, w, size or 2)
+	s.enabled = false
+	self:add(s)
+	return s
+end
+--
+function Group:vSeparator(color, size)
+	local n = self:getNumChildren()
+	local h = 10
+	if n > 0 then 
+		local last = self:getChildAt(n)
+		h = last:getHeight()
+	end
+	local s = Pixel.new(color or 0xffffff, 1, size or 2, h)
+	s.enabled = false
+	self:add(s)
+	return s
 end
 
 -------------------------------------------------------
@@ -878,7 +913,7 @@ function SUI:input(event)
 	local evType = event.type
 	
 	-- if there is focused elemnt then check only its input
-	--[[ WIP
+	--[[
 	local focus = SUI.focus
 	if focus and focus.enabled then 
 		return focus:input(event) 
