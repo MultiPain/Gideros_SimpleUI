@@ -4,7 +4,7 @@ Simple UI library for Gideros Studio
 ![preview](http://forum.giderosmobile.com/uploads/editor/9z/onq2m6ol36qa.gif)
 
 # Layout example
-![preview](../../../Gideros_examples/img/LayoutExample.png)
+![preview](https://github.com/MultiPain/Gideros_examples/blob/master/img/LayoutExample.png)
 ```lua
 app @ application
 app:setBackgroundColor(0x323232)
