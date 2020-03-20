@@ -198,6 +198,11 @@ function Base:init(images, callback, args)
 	self.gesture = Gesture.new(self)
 end
 --
+function Base:setCallback(callback)
+	self.callback = callback 
+	return self
+end
+--
 function Base:enable()
 	self:setAlpha(1)
 	self.enabled = true
@@ -876,6 +881,12 @@ end
 -------------------------------------------------------
 function SUI:label(...)
 	local l = Label.new(...)
+	self:addChild(l)
+	return l
+end
+-------------------------------------------------------
+function SUI:layout(...)
+	local l = Layout.new(...)
 	self:addChild(l)
 	return l
 end
