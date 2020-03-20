@@ -26,13 +26,10 @@ end
 -- clip (boolean): use clip or not (def: false) [optional]
 
 function Layout:init(w,h,clip)
-	assertPositiveNum(w, "Width")	
-	assertPositiveNum(h, "Height")
-	
 	self.enabled = true
 	
-	self._width = w or 100
-	self._height = h or 100
+	self._width = w or 0
+	self._height = h or 0
 	
 	self._prevW = 0
 	self._prevH = 0
@@ -218,16 +215,6 @@ function Layout:getByID(id)
 	end
 end
 ------------------------------------------
------------------- CACHE -----------------
-------------------------------------------
-function Layout:addToCache(name, value)
-	self._cache[name] = value
-end
---
-function Layout:getFromCache(name)
-	return self._cache[name]
-end
-------------------------------------------
 ------------ UPDATE (REBUILD) ------------
 ------------------------------------------
 function Layout:scaleAllWidth(scale)
@@ -289,40 +276,25 @@ function Layout:updateRelSize(parent, sw, sh)
 	end
 end
 --
-function Layout:getRelSumm()
-	local summW,summH = 0,0
+function Layout:getSumms()
+	local summWA,summHA = 0,0
+	local summWR,summHR = 0,0
 	for i,v in ipairs(self._data) do 
-		summW += v._relWidth
-		summH += v._relHeight
-	end
-	return summW, summH
-end
---
-function Layout:getAbsSumm()
-	local summW,summH = 0,0
-	for i,v in ipairs(self._data) do 
+		summWA += v._relWidth
+		summHA += v._relHeight
+		
 		if v._relWidth == 0 then 
-			summW += v._width + v._marginLeft + v._marginRight
+			summWR += v._width + v._marginLeft + v._marginRight
 		end
 		if v._relHeight == 0 then 
-			summH += v._height + v._marginUp + v._marginDown
+			summHR += v._height + v._marginUp + v._marginDown
 		end
 	end
-	return summW, summH
+	return summWA, summHA, summWR, summHR
 end
 --
 function Layout:colUpdate(ind, first)
-	-- пытаемся взять кэшированное значение суммы абсолютных высот из хранилища (в %)
-	local summH = self:getFromCache("summH")
-	-- если значение не кэшировано, то считаем его и записываем в кэш
-	if not summH then 
-		local w,h = self:getRelSumm()
-		self:addToCache("summW", w)
-		self:addToCache("summH", h)
-		summH = h
-	end
-	local absSW,absSH = self:getAbsSumm()
-	
+	local summW,summH, absSW,absSH = self:getSumms()	
 	local n = #self._data
 	-- максимальная ширина элемена (без отступа слева)
 	local maxW = first._width + first._marginRight
@@ -407,17 +379,7 @@ function Layout:colUpdate(ind, first)
 end
 --
 function Layout:rowUpdate(ind, first)
-	-- пытаемся взять кэшированное значение сумму всех строк 
-	-- с абсолютной шириной из хранилища (в %)
-	local summW = self:getFromCache("summW")
-	-- если значение не кэшировано, то считаем его и записываем в кэш
-	if not summW then 
-		local w,h = self:getRelSumm()
-		self:addToCache("summW", w)
-		self:addToCache("summH", h)
-		summW = w
-	end
-	local absSW,absSH = self:getAbsSumm()
+	local summW,summH, absSW,absSH = self:getSumms()
 	
 	local n = #self._data
 	-- максимальная высота элемена (без отступа слева)
@@ -523,6 +485,22 @@ function Layout:update(ind)
 	return self
 end
 
+--
+function Layout:recursiveUpdate()
+	local owner = self._owner
+	self:update()
+	if owner then 
+		owner:recursiveUpdate()
+	end
+	return self
+end
+------------------------------------------
+------------------ CLIP ------------------
+------------------------------------------
+function Layout:clip(flag)
+	self.clip = flag
+	return self
+end
 ------------------------------------------
 ----------------- QUERY ------------------
 ------------------------------------------
@@ -647,7 +625,7 @@ end
 ------------------------------------------
 -------------- CHANGE WIDTH --------------
 ------------------------------------------
--- TODO:
+--
 function Layout:relWidth(percent)
 	assertPositiveNum(percent, "relative width")
 	assert(percent <= 100, "[Layout]: relative width must be <= 100, but was: "..percent)
@@ -679,7 +657,7 @@ end
 ------------------------------------------
 -------------- CHANGE HEIGHT -------------
 ------------------------------------------
--- TODO:
+--
 function Layout:relHeight(percent)
 	assertPositiveNum(percent, "relative height")
 	assert(percent <= 100, "[Layout]: relative height must be <= 100, but was: "..percent)
@@ -754,7 +732,7 @@ function Layout:input(e)
 	if child then 
 		local n = child:getNumChildren()
 		for i = n, 1, -1 do 
-			local spr = self:getChildAt(i)
+			local spr = child:getChildAt(i)
 			if spr.enabled and spr.input and spr:input(e) then 
 				return true
 			end
@@ -786,101 +764,89 @@ local function overlapRect(x,y, rx,ry,rw,rh)
 	return not(x < rx or y < ry or x > rx+rw or y > ry+rh)
 end
 --
-function Layout:addResizeListenners()
-	assert(Layout.DEBUG, "[Layout]: this is a DEBUG fiture, but its turned off")
-	self:addEventListener("mouseHover", self.mouseHover, self)
-	self:addEventListener("mouseMove", self.mouseMove, self)
-	self:addEventListener("mouseDown", self.mouseDown, self)
+function Layout:allowResize(left, right, top, bottom)
+	self._resizeLeft = left
+	self._resizeRight = right
+	self._resizeTop = top
+	self._resizeBottom = bottom
+	
+	if not self:hasEventListener("mouseMove") then 
+		self:addEventListener("mouseHover", self.mouseHover, self)
+		self:addEventListener("mouseMove", self.mouseMove, self)
+		self:addEventListener("mouseDown", self.mouseDown, self)
+	end
+	return self
+end
+--
+function Layout:allowResizeAll(flag)
+	self._resizeLeft = flag
+	self._resizeRight = flag
+	self._resizeTop = flag
+	self._resizeBottom = flag
+	
+	if not self:hasEventListener("mouseMove") then 
+		self:addEventListener("mouseHover", self.mouseHover, self)
+		self:addEventListener("mouseMove", self.mouseMove, self)
+		self:addEventListener("mouseDown", self.mouseDown, self)
+	end
+	return self
+end
+--
+function Layout:resizeOffset(off)
+	self._resizeOffset = off
 	return self
 end
 --
 function Layout:mouseHover(e)
 	local cursor = "arrow"
-	local off = 6
 	local x,y = e.x,e.y
+	local off = self._resizeOffset or 10
 	local sx,sy = self:getPosition()
-	if overlapRect(x,y, sx-off,sy-off,off*2,off*2) then 
-		cursor = "sizeFDiag"
-		self._mode = "TL"
-	elseif overlapRect(x,y, sx+off,sy-off*2,self._width-off*2,off*2) then 
+	
+	if self._resizeTop and overlapRect(x,y, sx+off,sy-off,self._width-off*2,off*2) then 
 		cursor = "sizeVer"
 		self._mode = "T"
-	elseif overlapRect(x,y, sx+self._width-off,sy-off*2,off*2,off*2) then 
-		cursor = "sizeBDiag"
-		self._mode = "TR"
-	elseif overlapRect(x,y, sx+off,sy,self._width-off*2,off*2) then 
-		cursor = "sizeAll"
-		self._mode = "Drag"
-	elseif overlapRect(x,y, sx+self._width-off,sy+off,off*2,self._height-off*2) then 
+	elseif self._resizeRight and overlapRect(x,y, sx+self._width-off,sy+off,off*2,self._height-off*2) then 
 		cursor = "sizeHor"
 		self._mode = "R"
-	elseif overlapRect(x,y, sx+self._width-off,sy+self._height-off*2,off*2,off*2) then 
-		cursor = "sizeFDiag"
-		self._mode = "BR"
-	elseif overlapRect(x,y, sx+off,sy+self._height-off*2,self._width-off*2,off*2) then 
+	elseif self._resizeBottom and overlapRect(x,y, sx+off,sy+self._height-off*2,self._width-off*2,off*2) then 
 		cursor = "sizeVer"
 		self._mode = "B"
-	elseif overlapRect(x,y, sx-off,sy+self._height-off*2,off*2,off*2) then 
-		cursor = "sizeBDiag"
-		self._mode = "BL"
-	elseif overlapRect(x,y, sx-off,sy+off,off*2,self._height-off*2) then 
+	elseif self._resizeLeft and overlapRect(x,y, sx-off,sy+off,off*2,self._height-off*2) then 
 		cursor = "sizeHor"
 		self._mode = "L"
 	else
-		cursor = "arrow"
 		self._mode = ""
+		cursor = "arrow"
 	end
-	app:set("cursor", cursor)
+	application:set("cursor", cursor)
 end
 --
 function Layout:mouseMove(e)
 	local dx,dy = e.x - self._mpx, e.y - self._mpy
-	if self._mode == "Drag" then 
-		local sx,sy = self:getPosition()
-		self:setPosition(sx + dx, sy + dy)
-	elseif self._mode == "TL" then 
-		self:setPosition(e.x,e.y)
-		self:addSize(-dx,-dy)
-	elseif self._mode == "T" then 
+	if self._mode == "T" then 
 		self:setY(e.y)
 		self:addHeight(-dy)
-	elseif self._mode == "TR" then 
-		self:setY(e.y)
-		self:addSize(dx,-dy)
 	elseif self._mode == "R" then 
 		self:addWidth(dx)
-	elseif self._mode == "BR" then 
-		self:addSize(dx,dy)
 	elseif self._mode == "B" then 
 		self:addHeight(dy)
-	elseif self._mode == "BL" then 
-		self:setX(e.x)
-		self:addSize(-dx,dy)
 	elseif self._mode == "L" then 
 		self:setX(e.x)
 		self:addWidth(-dx)
 	end
-	if (dx ~= 0 or dy ~= 0) then 
+	--if (dx ~= 0 or dy ~= 0) then 
 		self:update()
 		if self.__owner then 
 			self.__owner:update()
 		end
-	end
+	--end
 	self._mpx = e.x
 	self._mpy = e.y
 end
 --
 function Layout:mouseDown(e)
-	if self._mode ~= "" then 
-		self._mpx = e.x
-		self._mpy = e.y
-	end
-	
-	if e.button == KeyCode.MOUSE_RIGHT then
-		local child = self:query(e.x,e.y)
-		if child then 
-			self:remove(child)
-		end
-	end
+	self._mpx = e.x
+	self._mpy = e.y
 end
 --
