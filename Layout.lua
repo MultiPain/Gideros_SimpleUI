@@ -728,7 +728,10 @@ end
 ------------ SUI INTEGRATION -------------
 ------------------------------------------
 function Layout:input(e)
-	local child = self:query(e.x, e.y)
+	local x = e.x or e.touch.x
+	local y = e.y or e.touch.y
+	
+	local child = self:query(x, y)
 	if child then 
 		local n = child:getNumChildren()
 		for i = n, 1, -1 do 
