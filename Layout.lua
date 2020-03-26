@@ -5,6 +5,28 @@ Layout = Core.class(Sprite)
 Layout.FIT = 1 -- максимально "забивает" колонку/строку элементами (без переноса в новую колонку/строку)
 Layout.WRAP = 2 -- если элемент не входит по высоте, то он переносится в новый столбец/строку
 Layout.DEBUG = false -- отрисовка всякой дебажной фигни :)
+
+local default = {
+	-- relative size (in %)
+	_relWidth = 0, -- 0: disabled
+	_relHeight = 0,
+	
+	_paddingLeft = 0,
+	_paddingRight = 0,
+	_paddingUp = 0,
+	_paddingDown = 0,
+	
+	_marginLeft = 0,
+	_marginRight = 0,
+	_marginUp = 0,
+	_marginDown = 0,
+	
+	_minW = 1, -- 0: disable
+	_minH = 1,
+	
+	_maxW = 0, -- 0: disable
+	_maxH = 0,
+}
 ------------------------------------------
 ---- THROW ERROR IF  v is nil and < 0 ----
 ------------------------------------------
@@ -27,6 +49,11 @@ end
 
 function Layout:init(w,h,clip)
 	self.enabled = true
+	self.type = "Layout"
+	
+	for k,v in pairs(default) do
+		self[k] = v
+	end
 	
 	self._width = w or 0
 	self._height = h or 0
@@ -34,31 +61,12 @@ function Layout:init(w,h,clip)
 	self._prevW = 0
 	self._prevH = 0
 	
-	-- relative size (in %)
-	self._relWidth = 0 -- 0: disabled
-	self._relHeight = 0
-	
-	self._paddingLeft = 0
-	self._paddingRight = 0
-	self._paddingUp = 0
-	self._paddingDown = 0
-	
-	self._marginLeft = 0
-	self._marginRight = 0
-	self._marginUp = 0
-	self._marginDown = 0
 	self._wrap = Layout.FIT
 	
 	self._orientation = "row" -- or "col"
 	
 	self._originalW = self._width
 	self._originalH = self._height
-	
-	self._minW = 1 -- 0: disable
-	self._minH = 1
-	
-	self._maxW = 0 -- 0: disable
-	self._maxH = 0
 	
 	-- plain list
 	self._data = {}
@@ -76,8 +84,6 @@ function Layout:init(w,h,clip)
 	self:addChild(self.__bgContainer)
 	
 	if Layout.DEBUG then 
-		self.__bgContainer:addChild(self.__gfx)
-		
 		self.__gfxMargin = Pixel.new(0, 0.15, 0, 0)
 		self.__bgContainer:addChild(self.__gfxMargin)
 		
@@ -136,24 +142,34 @@ function Layout:addChild(child)
 end
 --
 function Layout:child(child)
+	if child.type ~= "Layout" then 
+		for k,v in pairs(default) do
+			if not child[k] then 
+				child[k] = v
+			end
+		end
+		local w,h = child:getSize()
+		child._originalW = w
+		child._originalH = h
+		child:setPosition(0,0)
+	end
 	self:addChild(child)
-	
 	local ind = #self._data+1
 	child.__ind = ind
 	child.__owner = self
 	self._data[ind] = child
-	
 	--if ind - 1 > 0 then ind -= 1 end
 	return self
 end
 -- t (table): set of Layouts
 function Layout:childs(t)
 	for i,v in ipairs(t) do 
-		self:child(v)
+		self:child(v,flag)
 	end
 	self:update()
 	return self
 end
+--
 ------------------------------------------
 ------------- REMOVE CHILDS --------------
 ------------------------------------------
@@ -217,6 +233,7 @@ end
 ------------------------------------------
 ------------ UPDATE (REBUILD) ------------
 ------------------------------------------
+--
 function Layout:scaleAllWidth(scale)
 	local newX = self._paddingLeft
 	for i,row in ipairs(self._data) do 
@@ -225,16 +242,16 @@ function Layout:scaleAllWidth(scale)
 		local summMargin = row._marginLeft + row._marginRight
 		local fullW = 0
 		if row._relWidth > 0 then 
-			fullW = row._width + summMargin
+			fullW = row:getWidth() + summMargin
 		else
 			fullW = (row._originalW + summMargin) * scale
 		end
-		row:width(fullW - summMargin)
+		if row.width then row:width(fullW - summMargin) end
 		row:setPosition(
 			newX,
 			self._paddingUp + row._marginUp
 		)
-		newX += row._marginRight + row._width
+		newX += row._marginRight + row:getWidth()
 	end
 end
 --
@@ -246,17 +263,17 @@ function Layout:scaleAllHeight(scale)
 		local summMargin = row._marginUp + row._marginDown
 		local fullH = 0
 		if row._relHeight > 0 then
-			fullH = row._height + summMargin
+			fullH = row:getHeight() + summMargin
 		else
 			fullH = (row._originalH + summMargin) * scale
 		end
 		
-		row:height(fullH - summMargin)
+		if row.height then row:height(fullH - summMargin) end
 		row:setPosition(
 			self._paddingLeft + row._marginLeft,
 			newY
 		)
-		newY += row._marginDown + row._height
+		newY += row._marginDown + row:getHeight()
 	end
 end
 --
@@ -266,12 +283,12 @@ function Layout:updateRelSize(parent, sw, sh)
 	sh = sh or 0
 	
 	if relW > 0 then 
-		local newW = ((parent._width - parent._paddingLeft - parent._paddingRight - sw) * relW) / 100
+		local newW = ((parent:getWidth() - parent._paddingLeft - parent._paddingRight - sw) * relW) / 100
 		self:width(newW - self._marginLeft - self._marginRight)
 	end
 	local relH = self._relHeight
 	if relH > 0 then 
-		local newH = ((parent._height - parent._paddingUp - parent._paddingDown - sh) * relH) / 100
+		local newH = ((parent:getHeight() - parent._paddingUp - parent._paddingDown - sh) * relH) / 100
 		self:height(newH - self._marginUp - self._marginDown)
 	end
 end
@@ -284,10 +301,10 @@ function Layout:getSumms()
 		summHA += v._relHeight
 		
 		if v._relWidth == 0 then 
-			summWR += v._width + v._marginLeft + v._marginRight
+			summWR += v:getWidth() + v._marginLeft + v._marginRight
 		end
 		if v._relHeight == 0 then 
-			summHR += v._height + v._marginUp + v._marginDown
+			summHR += v:getHeight() + v._marginUp + v._marginDown
 		end
 	end
 	return summWA, summHA, summWR, summHR
@@ -297,9 +314,9 @@ function Layout:colUpdate(ind, first)
 	local summW,summH, absSW,absSH = self:getSumms()	
 	local n = #self._data
 	-- максимальная ширина элемена (без отступа слева)
-	local maxW = first._width + first._marginRight
+	local maxW = first:getWidth() + first._marginRight
 	-- максимальное занчение правого края элемента в колонке
-	local maxX = first._width + first._marginRight + first._marginLeft
+	local maxX = first:getWidth() + first._marginRight + first._marginLeft
 	
 	-- доступная высота родителя (без учета паддингов)(в px)
 	local aH = self._height - self._paddingUp - self._paddingDown	
@@ -322,7 +339,9 @@ function Layout:colUpdate(ind, first)
 		setID(row)
 		
 		-- меняем размер элемента 
-		row:updateRelSize(self, absSW, absSH)
+		if row.updateRelSize then 
+			row:updateRelSize(self, absSW, absSH)
+		end
 		
 		local x,y = last:getPosition()
 		if row._relHeight == 0 then 
@@ -343,20 +362,20 @@ function Layout:colUpdate(ind, first)
 			else
 				row:setPosition(
 					self._paddingLeft + row._marginLeft,
-					y + last._height + last._marginDown + row._marginUp
+					y + last:getHeight() + last._marginDown + row._marginUp
 				)
 			end
 		-- режим "перенос"
 		-- Layout.WRAP
 		elseif self._wrap == 2 then 
-			local newY = y + last._height + last._marginDown + row._marginUp
-			local nextY = newY + row._height + row._marginDown
+			local newY = y + last:getHeight() + last._marginDown + row._marginUp
+			local nextY = newY + row:getHeight() + row._marginDown
 			
-			if nextY > self._height - self._paddingDown then 
+			if nextY > self:getHeight() - self._paddingDown then 
 				newY = self._paddingUp + row._marginUp
 				row:setPosition(maxX + row._marginLeft + self._paddingLeft, newY)
-				maxW = row._width + row._marginRight
-				maxX += row._marginLeft + row._width + row._marginRight
+				maxW = row:getWidth() + row._marginRight
+				maxX += row._marginLeft + row:getWidth() + row._marginRight
 				isNewLine = true
 			else
 				local xx = self._paddingLeft + row._marginLeft
@@ -365,11 +384,13 @@ function Layout:colUpdate(ind, first)
 				end
 				row:setPosition(xx, newY)
 			end
-			maxW = maxW <> (row._width + row._marginRight)
-			maxX = maxX <> (row._width + row._marginRight + row._marginLeft)
+			maxW = maxW <> (row:getWidth() + row._marginRight)
+			maxX = maxX <> (row:getWidth() + row._marginRight + row._marginLeft)
 		end
 		
-		row:update()
+		if row.update then 
+			row:update()
+		end
 		last = row
 	end	
 	
@@ -383,12 +404,12 @@ function Layout:rowUpdate(ind, first)
 	
 	local n = #self._data
 	-- максимальная высота элемена (без отступа слева)
-	local maxH = first._height + first._marginDown
+	local maxH = first:getHeight() + first._marginDown
 	-- максимальное занчение нижнего края элемента в строке
-	local maxY = first._height + first._marginDown + first._marginUp
+	local maxY = first:getHeight() + first._marginDown + first._marginUp
 	
 	-- доступная ширина родителя (без учета паддингов)(в px)
-	local aW = self._width - self._paddingLeft - self._paddingRight
+	local aW = self:getWidth() - self._paddingLeft - self._paddingRight
 	
 	-- сумма абсолютных ширин элементов (в px)
 	local summAbsWidth = 0
@@ -429,21 +450,21 @@ function Layout:rowUpdate(ind, first)
 			-- если сумма допусимая, то просто ставим элемент правее предыдущего
 			else
 				row:setPosition(
-					x + last._width + last._marginLeft + row._marginRight,
+					x + last:getWidth() + last._marginLeft + row._marginRight,
 					self._paddingUp + row._marginUp
 				)
 			end
 		-- режим "перенос"
 		-- Layout.WRAP
 		elseif self._wrap == 2 then 
-			local newX = x + last._width + last._marginLeft + row._marginRight
-			local nextX = newX + row._width + row._marginRight
+			local newX = x + last:getWidth() + last._marginLeft + row._marginRight
+			local nextX = newX + row:getWidth() + row._marginRight
 			
-			if nextX > self._width - self._paddingRight then 
+			if nextX > self:getWidth() - self._paddingRight then 
 				newX = self._paddingLeft + row._marginLeft
 				--row:setPosition(newX, maxY + row._marginUp + self._paddingUp)
-				maxH = row._height + row._marginUp + row._marginDown
-				maxY += row._marginUp + row._height + row._marginDown
+				maxH = row:getHeight() + row._marginUp + row._marginDown
+				maxY += row._marginUp + row:getHeight() + row._marginDown
 				isNewLine = true
 			else
 				local yy = self._paddingUp + row._marginUp
@@ -452,8 +473,8 @@ function Layout:rowUpdate(ind, first)
 				end
 				row:setPosition(newX, yy)
 			end
-			maxH = maxH <> (row._height + row._marginDown)
-			maxY = maxH <> (row._height + row._marginDown + row._marginUp)
+			maxH = maxH <> (row:getHeight() + row._marginDown)
+			maxY = maxH <> (row:getHeight() + row._marginDown + row._marginUp)
 		end
 		
 		row:update()
@@ -468,10 +489,12 @@ end
 function Layout:update(ind)
 	ind = ind or 2
 	local n = #self._data
-	if n > 0 and (self._width ~= self._prevW or self._height ~= self._prevW) then 
+	if n > 0 and (self:getWidth() ~= self._prevW or self:getHeight() ~= self._prevW) then 
 		local first = self._data[1]
-		first:setPosition(self._paddingLeft + first._marginLeft, self._paddingUp + first._marginUp)	
-		first:updateRelSize(self)
+		first:setPosition(self._paddingLeft + (first._marginLeft or 0), self._paddingUp + (first._marginUp or 0)	)
+		if first.updateRelSize then 
+			first:updateRelSize(self)
+		end
 		first.__ind = 1
 		setID(first)
 		
@@ -479,7 +502,7 @@ function Layout:update(ind)
 		-- depending on "_orientation" variable
 		self[self._orientation.."Update"](self, ind, first)
 		
-		first:update()
+		if first.update then first:update() end
 		
 	end
 	return self
@@ -507,11 +530,13 @@ end
 function Layout:query(x, y)
 	if self:hitTestPoint(x, y) then 
 		for k,v in ipairs(self._data) do 
-			if v:hitTestPoint(x, y) then 
-				if #v._data > 0 then 
-					return v:query(x,y)
-				else
-					return v
+			if v.type == "Layout" then
+				if v:hitTestPoint(x, y) then 
+					if #v._data > 0 then 
+						return v:query(x,y)
+					else
+						return v
+					end
 				end
 			end
 		end
@@ -720,6 +745,7 @@ end
 --
 function Layout:setTextureBackground(texture, v, color, alpha)
 	self.__gfx:setTexture(texture)
+	self.__gfx:setColor(color or 0xffffff, alpha or 1)
 	self.__gfx:setNinePatch(v or 4)
 	self.__bgContainer:addChild(self.__gfx)
 	return self
@@ -733,12 +759,16 @@ function Layout:input(e)
 	
 	local child = self:query(x, y)
 	if child then 
-		local n = child:getNumChildren()
-		for i = n, 1, -1 do 
-			local spr = child:getChildAt(i)
-			if spr.enabled and spr.input and spr:input(e) then 
-				return true
+		if child.type == "Layout" then 
+			local n = child:getNumChildren()
+			for i = n, 1, -1 do 
+				local spr = child:getChildAt(i)
+				if spr.enabled and spr.input and spr:input(e) then 
+					return true
+				end
 			end
+		else
+			if child.enabled and child.input and child:input(e) then  return true end
 		end
 	end
 end
@@ -802,7 +832,7 @@ end
 --
 function Layout:mouseHover(e)
 	local cursor = "arrow"
-	local x,y = e.x,e.y
+	local x,y = self:globalToLocal(e.x,e.y)
 	local off = self._resizeOffset or 10
 	local sx,sy = self:getPosition()
 	
