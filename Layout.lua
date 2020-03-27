@@ -460,8 +460,6 @@ function Layout:rowUpdate(ind, first)
 			local newX = x + last:getWidth() + last._marginLeft + row._marginRight
 			local nextX = newX + row:getWidth() + row._marginRight
 			
-			print(i,nextX,maxY)
-			
 			if nextX > self:getWidth() - self._paddingRight then 
 				newX = self._paddingLeft + row._marginLeft
 				row:setPosition(newX, maxY + row._marginUp + self._paddingUp)
