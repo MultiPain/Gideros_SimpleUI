@@ -4,7 +4,7 @@
 Layout = Core.class(Sprite)
 Layout.FIT = 1 -- максимально "забивает" колонку/строку элементами (без переноса в новую колонку/строку)
 Layout.WRAP = 2 -- если элемент не входит по высоте, то он переносится в новый столбец/строку
-Layout.DEBUG = false -- отрисовка всякой дебажной фигни :)
+Layout.DEBUG = true -- отрисовка всякой дебажной фигни :)
 
 local default = {
 	-- relative size (in %)
@@ -79,11 +79,13 @@ function Layout:init(w,h,clip)
 		self:setClip(0,0,self._width, self._height)
 	end
 	
-	self.__gfx = Pixel.new(0xffffff, 0.15, self._width, self._height)
+	self.__gfx = Pixel.new(0,1, self._width, self._height)
 	self.__bgContainer = Sprite.new()
 	self:addChild(self.__bgContainer)
 	
 	if Layout.DEBUG then 
+		self:background(0xffffff, 0.15)
+		
 		self.__gfxMargin = Pixel.new(0, 0.15, 0, 0)
 		self.__bgContainer:addChild(self.__gfxMargin)
 		
@@ -166,7 +168,7 @@ function Layout:childs(t)
 	for i,v in ipairs(t) do 
 		self:child(v,flag)
 	end
-	self:update()
+	--self:update()
 	return self
 end
 --
@@ -246,7 +248,8 @@ function Layout:scaleAllWidth(scale)
 		else
 			fullW = (row._originalW + summMargin) * scale
 		end
-		if row.width then row:width(fullW - summMargin) end
+		
+		if row.width then row:width(fullW - summMargin)  end
 		row:setPosition(
 			newX,
 			self._paddingUp + row._marginUp
@@ -262,8 +265,9 @@ function Layout:scaleAllHeight(scale)
 		newY += row._marginUp
 		local summMargin = row._marginUp + row._marginDown
 		local fullH = 0
+		local hh = row:getHeight()
 		if row._relHeight > 0 then
-			fullH = row:getHeight() + summMargin
+			fullH = hh + summMargin
 		else
 			fullH = (row._originalH + summMargin) * scale
 		end
@@ -311,7 +315,7 @@ function Layout:getSumms()
 end
 --
 function Layout:colUpdate(ind, first)
-	local summW,summH, absSW,absSH = self:getSumms()	
+	local summW,summH, absSW,absSH = self:getSumms()
 	local n = #self._data
 	-- максимальная ширина элемена (без отступа слева)
 	local maxW = first:getWidth() + first._marginRight
@@ -340,7 +344,7 @@ function Layout:colUpdate(ind, first)
 		
 		-- меняем размер элемента 
 		if row.updateRelSize then 
-			row:updateRelSize(self, absSW, absSH)
+			row:updateRelSize(self, 0, absSH)
 		end
 		
 		local x,y = last:getPosition()
@@ -429,7 +433,7 @@ function Layout:rowUpdate(ind, first)
 		setID(row)
 		
 		-- меняем размер элемента 
-		if row.updateRelSize then row:updateRelSize(self, absSW,absSH) end
+		if row.updateRelSize then row:updateRelSize(self, absSW) end
 		
 		local x,y = last:getPosition()
 		if row._relWidth == 0 then 
@@ -475,26 +479,6 @@ function Layout:rowUpdate(ind, first)
 			end
 			maxH = maxH <> (row:getHeight() + row._marginDown)
 			maxY = maxY <> row:getY()
-			--[[
-			local newX = x + last:getWidth() + last._marginLeft + row._marginRight
-			local nextX = newX + row:getWidth() + row._marginRight
-			
-			if nextX > self:getWidth() - self._paddingRight then 
-				newX = self._paddingLeft + row._marginLeft
-				row:setPosition(newX, maxY + row._marginUp + self._paddingUp)
-				maxH = row:getHeight() + row._marginUp + row._marginDown
-				maxY += row._marginUp + row:getHeight() + row._marginDown
-				isNewLine = true
-			else
-				local yy = self._paddingUp + row._marginUp
-				if isNewLine then 
-					yy = y - last._marginUp + row._marginUp
-				end
-				row:setPosition(newX, yy)
-			end
-			maxH = maxH <> (row:getHeight() + row._marginDown)
-			maxY = maxY <> (row:getHeight() + row._marginDown + row._marginUp)
-			]]
 		end
 		
 		if row.update then row:update() end
@@ -686,6 +670,9 @@ function Layout:width(w)
 		w = self._maxW
 	end
 	assertPositiveNum(w, "width")
+	if self._width == 0 then 
+		self._originalW = w
+	end
 	self._prevW = self._width
 	self._width = w
 	self:updateClip()
@@ -718,6 +705,9 @@ function Layout:height(h)
 		h = self._maxH
 	end
 	assertPositiveNum(h, "height")
+	if self._height == 0 then 
+		self._originalH = h
+	end
 	self._prevH = self._height
 	self._height = h
 	self:updateClip()
@@ -757,13 +747,13 @@ end
 ------------------------------------------
 ---------------- ADD GFX -----------------
 ------------------------------------------
-function Layout:setSolidBackground(color, alpha)
+function Layout:background(color, alpha)
 	self.__gfx:setColor(color, alpha or 1)
 	self.__bgContainer:addChild(self.__gfx)
 	return self
 end
 --
-function Layout:setTextureBackground(texture, v, color, alpha)
+function Layout:textureBackground(texture, v, color, alpha)
 	self.__gfx:setTexture(texture)
 	self.__gfx:setColor(color or 0xffffff, alpha or 1)
 	self.__gfx:setNinePatch(v or 4)
