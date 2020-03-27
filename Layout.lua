@@ -460,9 +460,11 @@ function Layout:rowUpdate(ind, first)
 			local newX = x + last:getWidth() + last._marginLeft + row._marginRight
 			local nextX = newX + row:getWidth() + row._marginRight
 			
+			print(i,nextX,maxY)
+			
 			if nextX > self:getWidth() - self._paddingRight then 
 				newX = self._paddingLeft + row._marginLeft
-				--row:setPosition(newX, maxY + row._marginUp + self._paddingUp)
+				row:setPosition(newX, maxY + row._marginUp + self._paddingUp)
 				maxH = row:getHeight() + row._marginUp + row._marginDown
 				maxY += row._marginUp + row:getHeight() + row._marginDown
 				isNewLine = true
@@ -474,7 +476,7 @@ function Layout:rowUpdate(ind, first)
 				row:setPosition(newX, yy)
 			end
 			maxH = maxH <> (row:getHeight() + row._marginDown)
-			maxY = maxH <> (row:getHeight() + row._marginDown + row._marginUp)
+			maxY = maxY <> (row:getHeight() + row._marginDown + row._marginUp)
 		end
 		
 		if row.update then row:update() end
