@@ -429,7 +429,7 @@ function Layout:rowUpdate(ind, first)
 		setID(row)
 		
 		-- меняем размер элемента 
-		row:updateRelSize(self, absSW,absSH)
+		if row.updateRelSize then row:updateRelSize(self, absSW,absSH) end
 		
 		local x,y = last:getPosition()
 		if row._relWidth == 0 then 
@@ -477,7 +477,7 @@ function Layout:rowUpdate(ind, first)
 			maxY = maxH <> (row:getHeight() + row._marginDown + row._marginUp)
 		end
 		
-		row:update()
+		if row.update then row:update() end
 		last = row
 	end	
 	
