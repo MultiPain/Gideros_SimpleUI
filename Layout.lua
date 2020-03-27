@@ -316,7 +316,7 @@ function Layout:colUpdate(ind, first)
 	-- максимальная ширина элемена (без отступа слева)
 	local maxW = first:getWidth() + first._marginRight
 	-- максимальное занчение правого края элемента в колонке
-	local maxX = first:getWidth() + first._marginRight + first._marginLeft
+	local maxX = first:getX() --first:getWidth() + first._marginRight + first._marginLeft
 	
 	-- доступная высота родителя (без учета паддингов)(в px)
 	local aH = self._height - self._paddingUp - self._paddingDown	
@@ -373,7 +373,7 @@ function Layout:colUpdate(ind, first)
 			
 			if nextY > self:getHeight() - self._paddingDown then 
 				newY = self._paddingUp + row._marginUp
-				row:setPosition(maxX + row._marginLeft + self._paddingLeft, newY)
+				row:setPosition(maxX + maxW + row._marginLeft + self._paddingLeft, newY)
 				maxW = row:getWidth() + row._marginRight
 				maxX += row._marginLeft + row:getWidth() + row._marginRight
 				isNewLine = true
@@ -385,7 +385,7 @@ function Layout:colUpdate(ind, first)
 				row:setPosition(xx, newY)
 			end
 			maxW = maxW <> (row:getWidth() + row._marginRight)
-			maxX = maxX <> (row:getWidth() + row._marginRight + row._marginLeft)
+			maxX = maxX <> row:getX()
 		end
 		
 		if row.update then 
@@ -406,7 +406,7 @@ function Layout:rowUpdate(ind, first)
 	-- максимальная высота элемена (без отступа слева)
 	local maxH = first:getHeight() + first._marginDown
 	-- максимальное занчение нижнего края элемента в строке
-	local maxY = first:getHeight() + first._marginDown + first._marginUp
+	local maxY = first:getY()--first:getHeight() + first._marginDown + first._marginUp
 	
 	-- доступная ширина родителя (без учета паддингов)(в px)
 	local aW = self:getWidth() - self._paddingLeft - self._paddingRight
@@ -462,6 +462,25 @@ function Layout:rowUpdate(ind, first)
 			
 			if nextX > self:getWidth() - self._paddingRight then 
 				newX = self._paddingLeft + row._marginLeft
+				row:setPosition(newX, maxY + maxH + row._marginUp + self._paddingUp)
+				maxH = row:getHeight() + row._marginUp + row._marginDown
+				maxY += row._marginUp + row:getHeight() + row._marginDown
+				isNewLine = true
+			else
+				local yy = self._paddingUp + row._marginUp
+				if isNewLine then 
+					yy = y - last._marginUp + row._marginUp
+				end
+				row:setPosition(newX, yy)
+			end
+			maxH = maxH <> (row:getHeight() + row._marginDown)
+			maxY = maxY <> row:getY()
+			--[[
+			local newX = x + last:getWidth() + last._marginLeft + row._marginRight
+			local nextX = newX + row:getWidth() + row._marginRight
+			
+			if nextX > self:getWidth() - self._paddingRight then 
+				newX = self._paddingLeft + row._marginLeft
 				row:setPosition(newX, maxY + row._marginUp + self._paddingUp)
 				maxH = row:getHeight() + row._marginUp + row._marginDown
 				maxY += row._marginUp + row:getHeight() + row._marginDown
@@ -475,6 +494,7 @@ function Layout:rowUpdate(ind, first)
 			end
 			maxH = maxH <> (row:getHeight() + row._marginDown)
 			maxY = maxY <> (row:getHeight() + row._marginDown + row._marginUp)
+			]]
 		end
 		
 		if row.update then row:update() end
