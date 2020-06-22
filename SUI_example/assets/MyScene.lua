@@ -45,7 +45,7 @@ function MyScene:init()
 	subGroup = self.ui:vGroup(0, 10)
 	-- add some checkboxes
 	for i = 1, 4 do 
-		local cb = self.ui:checkBox("test", {Bitmap.new(PACK:getTextureRegion("check5.png")),Bitmap.new(PACK:getTextureRegion("check6.png"))},function(obj,state) print("CheckBox #"..obj.id, "State: "..state) end)
+		local cb = self.ui:checkBox("test", nil, {Bitmap.new(PACK:getTextureRegion("check5.png")),Bitmap.new(PACK:getTextureRegion("check6.png"))},function(obj,state) print("CheckBox #"..obj.id, "State: "..state) end)
 		cb.id = i
 		subGroup:add(cb)
 	end
@@ -54,7 +54,7 @@ function MyScene:init()
 	subGroup = self.ui:vGroup(0, 10)
 	-- add some radio buttons (actualy, its a checkbox, but without a group name)
 	for i = 1, 4 do 
-		local cb = self.ui:checkBox("", {Bitmap.new(PACK:getTextureRegion("check7.png")),Bitmap.new(PACK:getTextureRegion("check8.png"))},function(obj,state) print("ComboBox #"..obj.id, "State: "..state) end)
+		local cb = self.ui:checkBox("", nil, {Bitmap.new(PACK:getTextureRegion("check7.png")),Bitmap.new(PACK:getTextureRegion("check8.png"))},function(obj,state) print("ComboBox #"..obj.id, "State: "..state) end)
 		cb.id = i
 		subGroup:add(cb)
 	end
