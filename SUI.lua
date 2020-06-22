@@ -397,9 +397,9 @@ end
 ---------------------- CHECK BOX ----------------------
 -------------------------------------------------------
 
-local CheckBox = Core.class(Base, function(groupName, ...) return ... end)
+local CheckBox = Core.class(Base, function(groupName, state,...) return ... end)
 --  groupName (string): 
-function CheckBox:init(groupName)
+function CheckBox:init(groupName, state)
 	-- get images
 	local n = self:getNumChildren()
 	assert(n == 2 or n == 3, "[CheckBox]: incorrect amount of images. Must be 2 or 3, but was "..n)
@@ -417,7 +417,7 @@ function CheckBox:init(groupName)
 		self:setGroup(groupName)
 	end
 	
-	self:setState(SUI.defaultCheckBoxState, false)
+	self:setState(state or SUI.defaultCheckBoxState, false)
 	
 	-- save user callback 
 	self.__userCallback = self.callback
@@ -749,6 +749,7 @@ function Group:init(orientation, margin, offset)
 	self.orientation = orientation or "h"
 	self.margin = margin or 0
 	self.offset = offset or 0
+	self.ids = {}
 end
 --
 function Group:updatePosition(obj, n)
@@ -765,12 +766,15 @@ function Group:updatePosition(obj, n)
 	obj:setPosition(x,y)
 end
 --
-function Group:add(obj)
+function Group:add(obj,id)
 	local n = self:getNumChildren()
 	if (n == 0) then 
 		obj:setPosition(self.margin,self.margin)
 	else
 		self:updatePosition(obj, n)
+	end
+	if id then 
+		self.ids[id] = obj
 	end
 	self:addChild(obj)
 end
@@ -824,6 +828,10 @@ function Group:vSeparator(color, size)
 	return s
 end
 
+--
+function Group:getByID(id)
+	return self.ids[id]
+end
 -------------------------------------------------------
 -------------------- MAIN UI CLASS --------------------
 -------------------------------------------------------
